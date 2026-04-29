@@ -7,9 +7,7 @@ async function bootstrap() {
 
   await connectPostgres();
   await connectRabbit();
-
-  const order = await createOrderUseCase();
-  console.log('Order created:', order);
+  await createOrderUseCase();
 }
 
 bootstrap();

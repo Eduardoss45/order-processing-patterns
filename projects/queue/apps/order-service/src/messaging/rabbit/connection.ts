@@ -8,8 +8,12 @@ export const connectRabbit = async () => {
 
   channel = await conn.createChannel();
 
-  await channel.assertQueue('orders', {
+  await channel.assertQueue(env.QUEUE, {
     durable: true,
+    arguments: {
+      'x-dead-letter-exchange': '',
+      'x-dead-letter-routing-key': env.RETRY_QUEUE,
+    },
   });
 
   console.log(`RabbitMQ connected ${env.SERVICE_NAME}`);

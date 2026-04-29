@@ -1,6 +1,7 @@
+import { randomUUID } from 'crypto';
 import { getChannel } from '../rabbit/connection';
 
-export const sendOrderToQueue = async (orderId: string) => {
+export const sendOrderToQueue = async (orderId: string, correlationId: string) => {
   const channel = getChannel();
 
   const msg = {
@@ -10,7 +11,6 @@ export const sendOrderToQueue = async (orderId: string) => {
 
   channel.sendToQueue('orders', Buffer.from(JSON.stringify(msg)), {
     persistent: true,
+    correlationId,
   });
-
-  // console.log('Message sent to queue: ', message);
 };
