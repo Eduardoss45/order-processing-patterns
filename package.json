@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "build:packages": "npm run build --workspaces --if-present",
-    "dev:queue": "npm run build:packages && concurrently \"npm run dev -w order-service\" \"npm run dev -w worker-service\""
+    "dev:queue": "npm run build:packages && concurrently \"npm run dev -w order-service-queue\" \"npm run dev -w worker-service\"",
+    "dev:stream": "npm run build:packages && concurrently \"npm run dev -w order-service-stream\""
   },
   "workspaces": [
     "packages/*",

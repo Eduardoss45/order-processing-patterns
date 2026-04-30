@@ -1,5 +1,5 @@
 {
-  "name": "order-service-queue",
+  "name": "order-service-stream",
   "version": "1.0.0",
   "main": "main.ts",
   "scripts": {
