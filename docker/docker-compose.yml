@@ -11,6 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./infra/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -34,7 +35,7 @@ services:
       - KAFKA_PROCESS_ROLES=broker,controller
       - KAFKA_CONTROLLER_QUORUM_VOTERS=1@order-kafka:9093
       - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 # localhost (dev) / order-kafka (prod)
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
@@ -44,6 +45,14 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
     volumes:
       - kafka_data:/var/lib/kafka/data
+
+  kafka-init: # Só funciona se a rede for de order-kafka, ajustar no final do projeto para usar somente a rede da infra
+    image: apache/kafka:latest
+    depends_on:
+      - kafka
+    volumes:
+      - ./infra/cmd/kafka-init.sh:/init.sh
+    entrypoint: [ "/bin/sh", "/init.sh" ]
 
 volumes:
   postgres_data:

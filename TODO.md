@@ -1,53 +1,53 @@
 # Ordem de desenvolvimento (stream)
 
-Objetivo: implementar a versao **event-based / stream** descrita no `README.md`, usando Kafka (via Apache) e consumidores independentes.
+Objetivo: implementar a versão **event-based / stream** descrita no `README.md`, usando Kafka (via Apache) e consumidores independentes.
 
 Infra esperada em `projects/stream/docker-compose.yml`:
 
-- PostgreSQL
-- Apache (Kafka API)
+* PostgreSQL;
+* Apache (Kafka API).
 
 ---
 
-## 1. Fundacao (config + conexoes)
+## 1. Fundação (config + conexões)
 
-Objetivo: garantir que cada servico sobe sem erro.
+Objetivo: garantir que cada serviço sobe sem erro.
 
-- `dotenv` carregando
-- validacao com `zod` (env + payload de eventos)
-- conexao com PostgreSQL via `pg`
-- conexao com Kafka via `kafkajs`
-- logging com `pino` (ou `packages/logger`)
+* `dotenv` carregando;
+* validação com `zod` (env + payload de eventos);
+* conexão com PostgreSQL via `pg`;
+* conexão com Kafka via `kafkajs`;
+* logging com `pino` (ou `packages/logger`).
 
-Criterio de sucesso:
+Critério de sucesso:
 
-- o processo sobe
-- consegue conectar no DB
-- consegue conectar no broker Kafka
-
----
-
-## 2. Topicos (streams) e grupos de consumo
-
-Defina (no minimo) os topicos:
-
-- `order-created`
-- `payment-processed`
-- `inventory-updated`
-
-Defina grupos (um por servico consumidor):
-
-- `payment-service`
-- `inventory-service`
-- `notification-service`
-
-Criterio:
-
-- consegue publicar e consumir manualmente (ex.: via `rpk` / tooling do Apache)
+* O processo sobe;
+* consegue conectar no DB;
+* consegue conectar no broker Kafka.
 
 ---
 
-## 3. Contratos de eventos (shape + validacao)
+## 2. Tópicos (streams) e grupos de consumo
+
+Defina (no mínimo) os tópicos:
+
+* `order-created`;
+* `payment-processed`;
+* `inventory-updated`.
+
+Defina grupos (um por serviço consumidor):
+
+* `payment-service`;
+* `inventory-service`;
+* `notification-service`.
+
+Critério:
+
+* consegue publicar e consumir manualmente (ex.: via `rpk` / tooling do Apache).
+
+---
+
+## 3. Contratos de eventos (shape + validação)
 
 Padronize um envelope simples para todos os eventos:
 
@@ -63,21 +63,21 @@ Padronize um envelope simples para todos os eventos:
 
 Regras:
 
-- `eventId` unico (base para idempotencia)
-- `correlationId` estavel ao longo do fluxo (rastreio)
-- `payload` validado com `zod` no consumidor (fail-fast)
+* `eventId` único (base para idempotência);
+* `correlationId` estável ao longo do fluxo (rastreio);
+* `payload` validado com `zod` no consumidor (fail-fast).
 
-Criterio:
+Critério:
 
-- eventos invalidos sao rejeitados de forma previsivel (log + DLQ ou drop controlado)
+* eventos inválidos são rejeitados de forma previsível (log + DLQ ou drop controlado).
 
 ---
 
-## 4. Modelo de dados minimo (por servico)
+## 4. Modelo de dados mínimo (por serviço)
 
-Em streams, cada servico deve manter seu proprio estado (mesmo que, no laboratorio, tudo use o mesmo Postgres com schemas separados).
+Em streams, cada serviço deve manter seu próprio estado (mesmo que, no laboratório, tudo use o mesmo Postgres com schemas separados).
 
-Minimo recomendado:
+Mínimo recomendado:
 
 ```sql
 CREATE SCHEMA order_service;
@@ -105,9 +105,9 @@ CREATE TABLE notification_service.processed_events (
 );
 ```
 
-Criterio:
+Critério:
 
-- cada servico consegue persistir seu proprio progresso (mesmo que seja so `processed_events` no inicio)
+* cada serviço consegue persistir seu próprio progresso (mesmo que seja só `processed_events` no início).
 
 ---
 
@@ -130,9 +130,9 @@ Evento:
 }
 ```
 
-Criterio:
+Critério:
 
-- criar pedido resulta em mensagem no topico `order-created`
+* criar pedido resulta em mensagem no tópico `order-created`.
 
 ---
 
@@ -146,9 +146,9 @@ Fluxo:
 consome order-created -> processa pagamento (mock) -> publica payment-processed
 ```
 
-Criterio:
+Critério:
 
-- ao publicar `order-created`, aparece `payment-processed`
+* ao publicar `order-created`, aparece `payment-processed`.
 
 ---
 
@@ -162,9 +162,9 @@ Fluxo:
 consome payment-processed -> atualiza estoque (mock) -> publica inventory-updated
 ```
 
-Criterio:
+Critério:
 
-- ao aparecer `payment-processed`, aparece `inventory-updated`
+* ao aparecer `payment-processed`, aparece `inventory-updated`.
 
 ---
 
@@ -175,51 +175,51 @@ Criar `projects/stream/apps/notification-service`.
 Fluxo:
 
 ```text
-consome inventory-updated -> envia notificacao (mock) -> termina
+consome inventory-updated -> envia notificação (mock) -> termina
 ```
 
-Criterio:
+Critério:
 
-- ao aparecer `inventory-updated`, o servico registra "notificado"
+* ao aparecer `inventory-updated`, o serviço registra "notificado".
 
 ---
 
-## 9. Idempotencia (obrigatorio)
+## 9. Idempotência (obrigatório)
 
 Em cada consumidor:
 
-- antes de processar, checa `processed_events` por `eventId`
-- se ja existe: ignora (safe no-op)
-- se nao existe: processa e grava `eventId`
+* antes de processar, checa `processed_events` por `eventId`;
+* se já existe: ignora (safe no-op);
+* se não existe: processa e grava `eventId`.
 
-Criterio:
+Critério:
 
-- eventos duplicados nao geram efeitos colaterais duplicados
+* eventos duplicados não geram efeitos colaterais duplicados.
 
 ---
 
 ## 10. Falhas, retry e DLQ (streams)
 
-Defina uma estrategia minima (sem sofisticacao no inicio):
+Defina uma estratégia mínima (sem sofisticação no início):
 
-- em erro "recuperavel": retry (reprocessar a mesma mensagem)
-- em erro "nao recuperavel": publica em um DLQ (ex.: `order-created-dlq`, `payment-processed-dlq`)
+* em erro "recuperável": retry (reprocessar a mesma mensagem);
+* em erro "não recuperável": publica em um DLQ (ex.: `order-created-dlq`, `payment-processed-dlq`).
 
 Inclua no DLQ:
 
-- evento original
-- erro (mensagem + stack curta)
-- timestamp
+* evento original;
+* erro (mensagem + stack curta);
+* timestamp.
 
-Criterio:
+Critério:
 
-- falhas nao travam o pipeline; ficam observaveis e reprocessaveis
+* falhas não travam o pipeline; ficam observáveis e reprocessáveis.
 
 ---
 
 ## 11. Logs estruturados (rastreabilidade)
 
-Cada servico deve logar pelo menos:
+Cada serviço deve logar pelo menos:
 
 ```text
 [service] received eventName=... eventId=... correlationId=... topic=... partition=... offset=...
@@ -227,26 +227,26 @@ Cada servico deve logar pelo menos:
 [service] done
 ```
 
-Criterio:
+Critério:
 
-- da para reconstruir o caminho de um pedido olhando so os logs
+* dá para reconstruir o caminho de um pedido olhando só os logs.
 
 ---
 
 # Ordem resumida (checklist)
 
 ```text
-[ ] config + env (todos os servicos)
+[ ] config + env (todos os serviços)
 [ ] db conectado
 [ ] kafka conectado (Apache)
-[ ] topicos criados
+[ ] tópicos criados
 [ ] contrato/envelope + zod
 [ ] order-service publica order-created
 [ ] payment-service consome/publica payment-processed
 [ ] inventory-service consome/publica inventory-updated
 [ ] notification-service consome inventory-updated
-[ ] idempotencia por eventId (processed_events por servico)
-[ ] retry + DLQ por topico
+[ ] idempotência por eventId (processed_events por serviço)
+[ ] retry + DLQ por tópico
 [ ] logging estruturado
 ```
 
@@ -254,17 +254,17 @@ Criterio:
 
 # Regras durante o desenvolvimento
 
-- Nao implemente tudo de uma vez
-- Valide cada etapa isoladamente
-- So avance quando o anterior estiver estavel
+* Não implemente tudo de uma vez.
+* Valide cada etapa isoladamente.
+* Só avance quando o anterior estiver estável.
 
 ---
 
 # Insight importante
 
-O erro comum e transformar stream em "fila distribuida":
+O erro comum é transformar stream em "fila distribuída":
 
-- 1 unico consumidor fazendo tudo
-- eventos sem historico/reprocessamento
+* 1 único consumidor fazendo tudo;
+* eventos sem histórico/reprocessamento.
 
-Comece com o fluxo simples (um topico, um consumidor, um evento novo publicado) e evolua.
+Comece com o fluxo simples (um tópico, um consumidor, um evento novo publicado) e evolua.
