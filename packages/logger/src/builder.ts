@@ -7,10 +7,13 @@ export const buildLogger = (serviceName: string) => {
   const logger = createLogger(serviceName);
 
   return {
-    info: (msg: string, ctx?: ExtendedLogContext) => logger.info({ ...ctx }, msg),
+    info: <T extends Record<string, unknown> = {}>(msg: string, ctx?: LogContext & T) =>
+      logger.info({ ...ctx }, msg),
 
-    error: (msg: string, ctx?: ExtendedLogContext) => logger.error({ ...ctx }, msg),
+    error: <T extends Record<string, unknown> = {}>(msg: string, ctx?: LogContext & T) =>
+      logger.error({ ...ctx }, msg),
 
-    warn: (msg: string, ctx?: ExtendedLogContext) => logger.warn({ ...ctx }, msg),
+    warn: <T extends Record<string, unknown> = {}>(msg: string, ctx?: LogContext & T) =>
+      logger.warn({ ...ctx }, msg),
   };
 };

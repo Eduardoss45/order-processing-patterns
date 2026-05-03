@@ -1,11 +1,11 @@
 # Ordem de desenvolvimento (stream)
 
-Objetivo: implementar a versao **event-based / stream** descrita no `README.md`, usando Kafka (via Redpanda) e consumidores independentes.
+Objetivo: implementar a versao **event-based / stream** descrita no `README.md`, usando Kafka (via Apache) e consumidores independentes.
 
 Infra esperada em `projects/stream/docker-compose.yml`:
 
 - PostgreSQL
-- Redpanda (Kafka API)
+- Apache (Kafka API)
 
 ---
 
@@ -43,7 +43,7 @@ Defina grupos (um por servico consumidor):
 
 Criterio:
 
-- consegue publicar e consumir manualmente (ex.: via `rpk` / tooling do Redpanda)
+- consegue publicar e consumir manualmente (ex.: via `rpk` / tooling do Apache)
 
 ---
 
@@ -57,7 +57,7 @@ Padronize um envelope simples para todos os eventos:
   "eventName": "order-created",
   "occurredAt": "ISO-8601",
   "correlationId": "uuid",
-  "payload": { }
+  "payload": {}
 }
 ```
 
@@ -238,7 +238,7 @@ Criterio:
 ```text
 [ ] config + env (todos os servicos)
 [ ] db conectado
-[ ] kafka conectado (redpanda)
+[ ] kafka conectado (Apache)
 [ ] topicos criados
 [ ] contrato/envelope + zod
 [ ] order-service publica order-created
