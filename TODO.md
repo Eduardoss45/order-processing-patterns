@@ -4,8 +4,8 @@ Objetivo: implementar a versão **event-based / stream** descrita no `README.md`
 
 Infra esperada em `projects/stream/docker-compose.yml`:
 
-* PostgreSQL;
-* Apache (Kafka API).
+- PostgreSQL;
+- Apache (Kafka API).
 
 ---
 
@@ -13,17 +13,17 @@ Infra esperada em `projects/stream/docker-compose.yml`:
 
 Objetivo: garantir que cada serviço sobe sem erro.
 
-* `dotenv` carregando;
-* validação com `zod` (env + payload de eventos);
-* conexão com PostgreSQL via `pg`;
-* conexão com Kafka via `kafkajs`;
-* logging com `pino` (ou `packages/logger`).
+- `dotenv` carregando;
+- validação com `zod` (env + payload de eventos);
+- conexão com PostgreSQL via `pg`;
+- conexão com Kafka via `kafkajs`;
+- logging com `pino` (ou `packages/logger`).
 
 Critério de sucesso:
 
-* O processo sobe;
-* consegue conectar no DB;
-* consegue conectar no broker Kafka.
+- O processo sobe;
+- consegue conectar no DB;
+- consegue conectar no broker Kafka.
 
 ---
 
@@ -31,19 +31,19 @@ Critério de sucesso:
 
 Defina (no mínimo) os tópicos:
 
-* `order-created`;
-* `payment-processed`;
-* `inventory-updated`.
+- `order-created`;
+- `payment-processed`;
+- `inventory-updated`.
 
 Defina grupos (um por serviço consumidor):
 
-* `payment-service`;
-* `inventory-service`;
-* `notification-service`.
+- `payment-service`;
+- `inventory-service`;
+- `notification-service`.
 
 Critério:
 
-* consegue publicar e consumir manualmente (ex.: via `rpk` / tooling do Apache).
+- consegue publicar e consumir manualmente (ex.: via `rpk` / tooling do Apache).
 
 ---
 
@@ -63,13 +63,13 @@ Padronize um envelope simples para todos os eventos:
 
 Regras:
 
-* `eventId` único (base para idempotência);
-* `correlationId` estável ao longo do fluxo (rastreio);
-* `payload` validado com `zod` no consumidor (fail-fast).
+- `eventId` único (base para idempotência);
+- `correlationId` estável ao longo do fluxo (rastreio);
+- `payload` validado com `zod` no consumidor (fail-fast).
 
 Critério:
 
-* eventos inválidos são rejeitados de forma previsível (log + DLQ ou drop controlado).
+- eventos inválidos são rejeitados de forma previsível (log + DLQ ou drop controlado).
 
 ---
 
@@ -107,7 +107,7 @@ CREATE TABLE notification_service.processed_events (
 
 Critério:
 
-* cada serviço consegue persistir seu próprio progresso (mesmo que seja só `processed_events` no início).
+- cada serviço consegue persistir seu próprio progresso (mesmo que seja só `processed_events` no início).
 
 ---
 
@@ -132,7 +132,7 @@ Evento:
 
 Critério:
 
-* criar pedido resulta em mensagem no tópico `order-created`.
+- criar pedido resulta em mensagem no tópico `order-created`.
 
 ---
 
@@ -148,7 +148,7 @@ consome order-created -> processa pagamento (mock) -> publica payment-processed
 
 Critério:
 
-* ao publicar `order-created`, aparece `payment-processed`.
+- ao publicar `order-created`, aparece `payment-processed`.
 
 ---
 
@@ -164,7 +164,7 @@ consome payment-processed -> atualiza estoque (mock) -> publica inventory-update
 
 Critério:
 
-* ao aparecer `payment-processed`, aparece `inventory-updated`.
+- ao aparecer `payment-processed`, aparece `inventory-updated`.
 
 ---
 
@@ -180,7 +180,7 @@ consome inventory-updated -> envia notificação (mock) -> termina
 
 Critério:
 
-* ao aparecer `inventory-updated`, o serviço registra "notificado".
+- ao aparecer `inventory-updated`, o serviço registra "notificado".
 
 ---
 
@@ -188,13 +188,13 @@ Critério:
 
 Em cada consumidor:
 
-* antes de processar, checa `processed_events` por `eventId`;
-* se já existe: ignora (safe no-op);
-* se não existe: processa e grava `eventId`.
+- antes de processar, checa `processed_events` por `eventId`;
+- se já existe: ignora (safe no-op);
+- se não existe: processa e grava `eventId`.
 
 Critério:
 
-* eventos duplicados não geram efeitos colaterais duplicados.
+- eventos duplicados não geram efeitos colaterais duplicados.
 
 ---
 
@@ -202,18 +202,18 @@ Critério:
 
 Defina uma estratégia mínima (sem sofisticação no início):
 
-* em erro "recuperável": retry (reprocessar a mesma mensagem);
-* em erro "não recuperável": publica em um DLQ (ex.: `order-created-dlq`, `payment-processed-dlq`).
+- em erro "recuperável": retry (reprocessar a mesma mensagem);
+- em erro "não recuperável": publica em um DLQ (ex.: `order-created-dlq`, `payment-processed-dlq`).
 
 Inclua no DLQ:
 
-* evento original;
-* erro (mensagem + stack curta);
-* timestamp.
+- evento original;
+- erro (mensagem + stack curta);
+- timestamp.
 
 Critério:
 
-* falhas não travam o pipeline; ficam observáveis e reprocessáveis.
+- falhas não travam o pipeline; ficam observáveis e reprocessáveis.
 
 ---
 
@@ -229,7 +229,7 @@ Cada serviço deve logar pelo menos:
 
 Critério:
 
-* dá para reconstruir o caminho de um pedido olhando só os logs.
+- dá para reconstruir o caminho de um pedido olhando só os logs.
 
 ---
 
@@ -254,9 +254,9 @@ Critério:
 
 # Regras durante o desenvolvimento
 
-* Não implemente tudo de uma vez.
-* Valide cada etapa isoladamente.
-* Só avance quando o anterior estiver estável.
+- Não implemente tudo de uma vez.
+- Valide cada etapa isoladamente.
+- Só avance quando o anterior estiver estável.
 
 ---
 
@@ -264,7 +264,7 @@ Critério:
 
 O erro comum é transformar stream em "fila distribuída":
 
-* 1 único consumidor fazendo tudo;
-* eventos sem histórico/reprocessamento.
+- 1 único consumidor fazendo tudo;
+- eventos sem histórico/reprocessamento.
 
 Comece com o fluxo simples (um tópico, um consumidor, um evento novo publicado) e evolua.
