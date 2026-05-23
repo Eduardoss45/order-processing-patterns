@@ -1,0 +1,9 @@
+{
+    "name": "inventory-service",
+    "version": "1.0.0",
+    "main": "main.ts",
+    "scripts": {
+        "dev": "ts-node-dev src/main.ts"
+    },
+    "type": "commonjs"
+}

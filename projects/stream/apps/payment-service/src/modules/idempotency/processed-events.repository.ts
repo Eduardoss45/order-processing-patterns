@@ -14,3 +14,12 @@ export const markEventProcessed = async (eventId: string) => {
     [eventId]
   );
 };
+
+export const tryMarkEventProcessing = async (eventId: string) => {
+  const r = await pool.query(
+    'INSERT INTO payment_service.processed_events (event_id) VALUES ($1) ON CONFLICT DO NOTHING',
+    [eventId]
+  );
+
+  return (r.rowCount ?? 0) > 0;
+};

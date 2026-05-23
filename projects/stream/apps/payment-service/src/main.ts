@@ -1,5 +1,5 @@
 import { connectPostgres } from './infra/db/connection';
-import { startProducer } from '../../order-service/src/messaging/kafka/kafka.producer';
+import { startProducer } from './messaging/kafka/kafka.producer';
 import { startOrderCreatedConsumer } from './messaging/consumer/order-created.consumer';
 
 async function bootstrap() {

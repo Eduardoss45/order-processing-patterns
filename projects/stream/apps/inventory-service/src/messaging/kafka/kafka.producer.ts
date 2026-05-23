@@ -1,7 +1,7 @@
 import { Producer } from 'kafkajs';
 import { kafka } from './kafka.client';
 
-let producer: Producer;
+let producer: Producer | null = null;
 
 export const getKafkaProducer = () => {
   if (!producer) producer = kafka.producer();
@@ -10,5 +10,4 @@ export const getKafkaProducer = () => {
 
 export const startProducer = async () => {
   await getKafkaProducer().connect();
-  console.log('Producer connected');
 };
