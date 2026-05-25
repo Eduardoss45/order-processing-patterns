@@ -4,7 +4,7 @@
   "scripts": {
     "build:packages": "npm run build --workspaces --if-present",
     "dev:queue": "npm run build:packages && concurrently \"npm run dev -w order-service-queue\" \"npm run dev -w worker-service\"",
-    "dev:stream": "npm run build:packages && concurrently \"npm run dev -w order-service-stream\" \"npm run dev -w payment-service\" \"npm run dev -w inventory-service\""
+    "dev:stream": "npm run build:packages && concurrently \"npm run dev -w order-service-stream\" \"npm run dev -w payment-service\" \"npm run dev -w inventory-service\" \"npm run dev -w notification-service\""
   },
   "workspaces": [
     "packages/*",

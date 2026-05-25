@@ -1,326 +1,391 @@
 # Order Pipeline — Queue vs Stream
 
-## Objetivo
+## Visão geral
 
-Este projeto existe para comparar **dois modelos arquiteturais distintos** usando o mesmo domínio:
+Este repositório implementa duas arquiteturas diferentes para o mesmo domínio de processamento de pedidos:
 
-* Versão 1: **Orientada a fila (task-based)**
-* Versão 2: **Orientada a stream (event-based)**
+* Uma arquitetura orientada a fila (**Queue / task-based**)
+* Uma arquitetura orientada a eventos (**Stream / event-based**)
 
-O objetivo NÃO é trocar tecnologia. O objetivo é entender como o **modelo mental muda**.
+O objetivo do projeto é demonstrar, de forma prática, como o fluxo operacional, o desacoplamento entre serviços e o comportamento de mensageria mudam entre os dois modelos.
 
 ---
 
 # Domínio
 
-Sistema simplificado de processamento de pedidos.
+O domínio simula um pipeline simplificado de processamento de pedidos.
 
-Um pedido passa por 3 etapas:
+Cada pedido passa pelas seguintes etapas:
 
-1. Pagamento
+1. Processamento de pagamento
 2. Atualização de estoque
-3. Notificação ao usuário
+3. Envio de notificação
 
 ---
 
 # Estrutura do repositório
 
-```
+```txt
 order-pipeline/
-  queue-version/
-  stream-version/
-  shared/
+├── projects/
+│   ├── queue/
+│   │   ├── apps/
+│   │   │   ├── order-service/       # workspace: order-service-queue
+│   │   │   └── worker-service/
+│   │
+│   └── stream/
+│       ├── apps/
+│       │   ├── order-service/       # workspace: order-service-stream
+│       │   ├── payment-service/
+│       │   ├── inventory-service/
+│       │   └── notification-service/
+│
+├── packages/
+│   ├── shared-validation/
+│   └── logger/
+│
+├── docker/
+│   └── docker-compose.full.yml
+│
+└── package.json
 ```
 
-* `shared/`: tipos, contratos JSON e utilitários
+---
+
+# Workspaces
+
+| Pasta                                       | Workspace              | Responsabilidade                           |
+| ------------------------------------------- | ---------------------- | ------------------------------------------ |
+| `projects/queue/apps/order-service`         | `order-service-queue`  | Criação de pedidos e publicação de tarefas |
+| `projects/queue/apps/worker-service`        | `worker-service`       | Processamento centralizado do fluxo        |
+| `projects/stream/apps/order-service`        | `order-service-stream` | Publicação do evento inicial               |
+| `projects/stream/apps/payment-service`      | `payment-service`      | Processamento de pagamento                 |
+| `projects/stream/apps/inventory-service`    | `inventory-service`    | Atualização de estoque                     |
+| `projects/stream/apps/notification-service` | `notification-service` | Envio de notificações                      |
 
 ---
 
-# Versão 1 — Arquitetura com FILA
-
-## Modelo mental
-
-* Mensagem = **tarefa a ser executada**
-* Um consumidor processa cada mensagem
-* Foco: **execução confiável**
-
----
+# Arquitetura Queue
 
 ## Componentes
 
-### 1. order-service
-
-Responsável por:
-
-* Criar pedidos
-* Enviar tarefa para fila
-
-### 2. order-worker (orquestrador)
-
-Responsável por:
-
-* Consumir mensagens da fila
-* Executar TODAS as etapas do pedido
-
-### 3. Filas
-
-* `orders`
-* `orders-dlq` (dead letter)
+| Serviço               | Responsabilidade                           |
+| --------------------- | ------------------------------------------ |
+| `order-service-queue` | Criação de pedidos e publicação de tarefas |
+| `worker-service`      | Processamento completo do fluxo do pedido  |
+| RabbitMQ              | Transporte e retry de mensagens            |
+| PostgreSQL            | Persistência de dados                      |
 
 ---
 
-## Fluxo detalhado
+## Fluxo
 
-1. order-service cria pedido
-
-```json
-{
-  "orderId": "123",
-  "userId": "abc",
-  "items": [{ "productId": "p1", "qty": 2 }]
-}
+```mermaid
+flowchart LR
+    A["order-service-queue"] -->|publica tarefa| Q["RabbitMQ: orders"]
+    Q --> B["worker-service"]
+    B --> P["processPayment()"]
+    B --> I["updateInventory()"]
+    B --> N["sendNotification()"]
+    B --> D["Postgres"]
+    B --> R["Retry Queue"]
+    R --> Q
+    B --> L["DLQ: orders_dlq"]
 ```
 
-2. Envia mensagem para fila `orders`
+---
 
-Mensagem:
+## Filas utilizadas
+
+| Fila         | Objetivo          |
+| ------------ | ----------------- |
+| `orders`     | Fila principal    |
+| `orders_dlq` | Dead letter queue |
+
+---
+
+## Payload publicado
 
 ```json
 {
   "type": "process-order",
-  "payload": { ...order }
+  "payload": {
+    "orderId": "123",
+    "userId": "abc",
+    "items": [
+      {
+        "productId": "p1",
+        "qty": 2
+      }
+    ]
+  }
 }
 ```
-
-3. order-worker consome a mensagem
-
-4. Executa sequencialmente:
-
-* processPayment(order)
-* updateInventory(order)
-* sendNotification(order)
-
-5. Se tudo OK → ACK
-
-6. Se falhar:
-
-* retry
-* ou DLQ
-
----
-
-## Responsabilidades claras
-
-| Componente    | Responsabilidade |
-| ------------- | ---------------- |
-| order-service | Produzir tarefa  |
-| order-worker  | Executar tudo    |
-| fila          | Buffer + entrega |
 
 ---
 
 ## Características
 
-* Forte acoplamento de fluxo
-* Um ponto central de execução
-* Sem histórico após consumo
+* Fluxo centralizado em um único worker
+* Mensagens representam tarefas
+* Retry controlado pela fila
+* Dead letter queue para falhas permanentes
+* Mensagens removidas após consumo
 
 ---
 
-# Versão 2 — Arquitetura com STREAM
-
-## Modelo mental
-
-* Mensagem = **evento (fato ocorrido)**
-* Múltiplos consumidores independentes
-* Foco: **propagação de estado**
-
----
+# Arquitetura Stream
 
 ## Componentes
 
-### 1. order-service
-
-* Cria pedido
-* Publica evento
-
-### 2. payment-service
-
-### 3. inventory-service
-
-### 4. notification-service
-
-Todos independentes.
+| Serviço                | Responsabilidade                                  |
+| ---------------------- | ------------------------------------------------- |
+| `order-service-stream` | Criação de pedidos e publicação do evento inicial |
+| `payment-service`      | Processamento de pagamento                        |
+| `inventory-service`    | Atualização de estoque                            |
+| `notification-service` | Envio de notificação                              |
+| Kafka                  | Distribuição de eventos                           |
+| PostgreSQL             | Persistência de dados                             |
 
 ---
 
-## Tópicos (streams)
+## Fluxo
 
-* `order-created`
-* `payment-processed`
-* `inventory-updated`
+```mermaid
+flowchart LR
+    O["order-service-stream"] -->|order-created| T1["Kafka topic: order-created"]
+    T1 --> P["payment-service"]
+    P -->|payment-processed| T2["Kafka topic: payment-processed"]
+    T2 --> I["inventory-service"]
+    I -->|inventory-updated| T3["Kafka topic: inventory-updated"]
+    T3 --> N["notification-service"]
+
+    O --> DB["Postgres"]
+    P --> DB
+    I --> DB
+    N --> DB
+
+    P --> PD["order-created-dlq"]
+    I --> ID["payment-processed-dlq"]
+    N --> ND["inventory-updated-dlq"]
+```
 
 ---
 
-## Fluxo detalhado (SEM ORQUESTRADOR)
+## Topics utilizados
 
-### Etapa 1 — criação
+| Topic               | Objetivo                 |
+| ------------------- | ------------------------ |
+| `order-created`     | Evento inicial do pedido |
+| `payment-processed` | Resultado do pagamento   |
+| `inventory-updated` | Atualização de estoque   |
 
-order-service publica:
+---
+
+## Contrato de eventos
+
+Todos os eventos seguem um envelope padronizado:
 
 ```json
 {
-  "event": "order-created",
-  "orderId": "123",
-  "userId": "abc",
-  "items": [...]
+  "eventId": "evt_123",
+  "eventName": "order-created",
+  "occurredAt": "2026-05-25T18:00:00.000Z",
+  "correlationId": "corr_789",
+  "payload": {
+    "orderId": "123",
+    "userId": "abc",
+    "items": [
+      {
+        "productId": "p1",
+        "qty": 2
+      }
+    ]
+  }
 }
 ```
 
 ---
 
-### Etapa 2 — pagamento
+## Dead Letter Queues
 
-payment-service:
+| DLQ                     | Serviço                |
+| ----------------------- | ---------------------- |
+| `order-created-dlq`     | `payment-service`      |
+| `payment-processed-dlq` | `inventory-service`    |
+| `inventory-updated-dlq` | `notification-service` |
 
-* Consome: `order-created`
-* Executa pagamento
-* Publica:
+---
 
-```json
-{
-  "event": "payment-processed",
-  "orderId": "123",
-  "status": "success"
-}
+## Idempotência
+
+Todos os consumidores utilizam controle de idempotência baseado na tabela:
+
+```txt
+processed_events
+```
+
+Cada serviço mantém seu próprio registro de eventos processados para evitar duplicações e reprocessamentos indevidos.
+
+---
+
+# Observabilidade
+
+O projeto utiliza `@repo/logger` para padronização de logs estruturados.
+
+Campos principais:
+
+| Campo           | Objetivo                 |
+| --------------- | ------------------------ |
+| `service`       | Serviço emissor          |
+| `correlationId` | Rastreamento distribuído |
+| `orderId`       | Identificação do pedido  |
+| `topic`         | Topic Kafka              |
+| `offset`        | Offset consumido         |
+
+---
+
+# Execução local
+
+## Instalação
+
+```bash
+npm install
 ```
 
 ---
 
-### Etapa 3 — estoque
+## Queue
 
-inventory-service:
+Dependências:
 
-* Consome: `payment-processed`
-* Atualiza estoque
-* Publica:
+* PostgreSQL
+* RabbitMQ
 
-```json
-{
-  "event": "inventory-updated",
-  "orderId": "123"
-}
+Executar:
+
+```bash
+npm run dev:queue
 ```
 
 ---
-
-### Etapa 4 — notificação
-
-notification-service:
-
-* Consome: `inventory-updated`
-* Envia notificação
-
----
-
-## Responsabilidades claras
-
-| Serviço              | Consome           | Publica           |
-| -------------------- | ----------------- | ----------------- |
-| order-service        | -                 | order-created     |
-| payment-service      | order-created     | payment-processed |
-| inventory-service    | payment-processed | inventory-updated |
-| notification-service | inventory-updated | -                 |
-
----
-
-## Características
-
-* Sem orquestrador central
-* Alto desacoplamento
-* Histórico persistente
-* Reprocessamento possível
-
----
-
-# Diferença crítica
-
-## Fila
-
-```text
-"Faça isso"
-```
 
 ## Stream
 
-```text
-"Isso aconteceu"
+Dependências:
+
+* PostgreSQL
+* Kafka
+* Topics inicializados via `kafka-init`
+
+Executar:
+
+```bash
+npm run dev:stream
 ```
 
 ---
 
-# Regras obrigatórias do projeto
+# Docker
 
-## 1. Idempotência
+O projeto possui execução segmentada utilizando Docker profiles.
 
-Todos os consumidores devem suportar mensagens duplicadas.
+Arquivo:
 
----
-
-## 2. Falhas
-
-Simular:
-
-* queda de serviço
-* retry
-* duplicação
-
----
-
-## 3. Logs obrigatórios
-
-Cada etapa deve logar:
-
-```
-[service] received event
-[service] processing
-[service] done
+```bash
+docker/docker-compose.full.yml
 ```
 
 ---
 
-# O que validar
+## Executar arquitetura Queue
 
-## Na versão fila
-
-* Apenas um worker executa o fluxo
-* Mensagem desaparece após consumo
-
-## Na versão stream
-
-* Múltiplos serviços reagem ao mesmo evento
-* Eventos permanecem disponíveis
+```bash
+docker compose -f docker/docker-compose.full.yml --profile queue up
+```
 
 ---
 
-# Critério de sucesso
+## Executar arquitetura Stream
 
-Você deve conseguir responder sem hesitação:
-
-* Quem produz cada mensagem?
-* Quem consome?
-* A mensagem representa ação ou fato?
-* É possível reprocessar?
-
-Se qualquer resposta não estiver clara, a arquitetura está incorreta.
+```bash
+docker compose -f docker/docker-compose.full.yml --profile stream up
+```
 
 ---
 
-# Observação final
+# Infraestrutura por profile
 
-Se a versão stream parecer apenas uma fila distribuída, o modelo foi implementado errado.
+```mermaid
+flowchart TB
+    subgraph Infra["Infra compartilhada"]
+      PG["postgres"]
+    end
 
-O objetivo é internalizar:
+    subgraph Queue["Profile: queue"]
+      RMQ["rabbitmq"]
+      OSQ["order-service-queue"]
+      WS["worker-service"]
+      OSQ --> RMQ --> WS
+      OSQ --> PG
+      WS --> PG
+    end
 
-* Fila = execução
-* Stream = histórico + reação
+    subgraph Stream["Profile: stream"]
+      K["kafka"]
+      KI["kafka-init"]
+      OSS["order-service-stream"]
+      PS["payment-service"]
+      IS["inventory-service"]
+      NS["notification-service"]
+      OSS --> K --> PS --> K --> IS --> K --> NS
+      KI --> K
+      OSS --> PG
+      PS --> PG
+      IS --> PG
+      NS --> PG
+    end
+```
+
+---
+
+# Diferenças arquiteturais
+
+| Queue                      | Stream                            |
+| -------------------------- | --------------------------------- |
+| Mensagem representa tarefa | Mensagem representa evento        |
+| Fluxo centralizado         | Fluxo distribuído                 |
+| Consumo destrutivo         | Histórico persistente             |
+| Worker orquestra etapas    | Serviços reagem independentemente |
+| Retry na fila              | Reprocessamento por offset        |
+
+---
+
+# Stack
+
+## Queue
+
+* Node.js
+* RabbitMQ
+* PostgreSQL
+* Docker
+
+---
+
+## Stream
+
+* Node.js
+* Apache Kafka
+* PostgreSQL
+* Docker
+
+---
+
+# Objetivo técnico do projeto
+
+O projeto foi desenvolvido para documentar e comparar duas abordagens reais de comunicação assíncrona:
+
+* processamento orientado a tarefas
+* propagação orientada a eventos
+
+A implementação mantém o mesmo domínio e responsabilidades equivalentes entre as duas arquiteturas para evidenciar exclusivamente as diferenças de modelagem, acoplamento e fluxo operacional.

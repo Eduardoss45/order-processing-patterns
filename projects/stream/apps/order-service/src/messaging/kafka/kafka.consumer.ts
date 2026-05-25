@@ -1,5 +1,8 @@
 import { kafka } from './kafka.client';
 import { env } from '../../config/env';
+import { buildLogger } from '@repo/logger';
+
+const logger = buildLogger(env.SERVICE_NAME);
 
 export const startConsumer = async () => {
   const consumer = kafka.consumer({
@@ -8,7 +11,7 @@ export const startConsumer = async () => {
 
   await consumer.connect();
 
-  console.log('Consumer connected');
+  logger.info('Consumer connected');
 
   return consumer;
 };

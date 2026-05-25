@@ -1,10 +1,14 @@
 import { kafka } from './kafka.client';
+import { buildLogger } from '@repo/logger';
+import { env } from '../../config/env';
+
+const logger = buildLogger(env.SERVICE_NAME);
 
 export const startAdmin = async () => {
   const admin = kafka.admin();
 
   await admin.connect();
-  console.log('Admin connected');
+  logger.info('Admin connected');
 
   const existingTopics = await admin.listTopics();
 
@@ -22,9 +26,9 @@ export const startAdmin = async () => {
       waitForLeaders: true,
     });
 
-    console.log('Topics created:', topicsToCreate);
+    logger.info('Topics created', { topics: topicsToCreate });
   } else {
-    console.log('Topics already exist');
+    logger.info('Topics already exist');
   }
 
   await admin.disconnect();

@@ -1,7 +1,9 @@
 import amqp from 'amqplib';
 import { env } from '../../config/env';
+import { buildLogger } from '@repo/logger';
 
 let channel: amqp.Channel;
+const logger = buildLogger(env.SERVICE_NAME);
 
 export const connectRabbit = async () => {
   const conn = await amqp.connect(env.RABBITMQ_URL);
@@ -29,7 +31,7 @@ export const connectRabbit = async () => {
     },
   });
 
-  console.log(`RabbitMQ connected ${env.SERVICE_NAME}`);
+  logger.info('RabbitMQ connected');
 };
 
 export const getChannel = () => {

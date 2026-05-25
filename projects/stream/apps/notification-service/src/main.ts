@@ -1,6 +1,5 @@
 import { connectPostgres } from './infra/db/connection';
-import { startProducer } from './messaging/kafka/kafka.producer';
-import { startPaymentProcessedConsumer } from './messaging/consumer/payment-processed.consumer';
+import { startInventoryUpdatedConsumer } from './messaging/consumer/inventory-updated.consumer';
 import { buildLogger } from '@repo/logger';
 import { env } from './config/env';
 import { withRetry } from './bootstrap/with-retry';
@@ -11,8 +10,7 @@ async function bootstrap() {
   logger.info('Service starting');
 
   await withRetry(connectPostgres, logger, 'PostgreSQL');
-  await withRetry(startProducer, logger, 'Kafka producer');
-  await withRetry(startPaymentProcessedConsumer, logger, 'Kafka consumer');
+  await withRetry(startInventoryUpdatedConsumer, logger, 'Kafka consumer');
 
   logger.info('Service started');
 }

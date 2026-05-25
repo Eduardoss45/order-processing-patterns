@@ -1,4 +1,3 @@
-import { log } from 'node:console';
 import { env } from '../../config/env';
 import { processOrder } from '../../modules/order/order.processor';
 import { isMessageProcessed, markMessageAsProcessed } from '../../modules/order/order.repository';
@@ -55,7 +54,10 @@ export const startOrderConsumer = async () => {
 
         const retryCount = getRetryCount(msg);
 
-        console.error('Processing failed: ', orderId, 'retry: ', retryCount);
+        logger.warn('Routing message to retry/DLQ', {
+          ...ctx,
+          retryCount,
+        });
 
         if (retryCount >= env.MAX_RETRIES) {
           channel.sendToQueue(env.DLQ, msg.content, {
