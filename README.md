@@ -389,3 +389,7 @@ O projeto foi desenvolvido para documentar e comparar duas abordagens reais de c
 * propagação orientada a eventos
 
 A implementação mantém o mesmo domínio e responsabilidades equivalentes entre as duas arquiteturas para evidenciar exclusivamente as diferenças de modelagem, acoplamento e fluxo operacional.
+
+# Melhorias
+
+Adicionar gateway para orquestrar as aplicações de stream e queue.
